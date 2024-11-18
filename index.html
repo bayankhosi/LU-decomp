@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matrix Decomposition Web App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 20px;
+            background-color: #f4f4f4;
+            border-radius: 8px;
+        }
+        table {
+            margin: 20px 0;
+        }
+        input {
+            width: 50px;
+            text-align: center;
+        }
+        button {
+            margin: 10px 0;
+            padding: 10px 15px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .result {
+            background-color: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .matrix {
+            display: table;
+            margin: 10px 0;
+        }
+        .matrix-row {
+            display: table-row;
+        }
+        .matrix-cell {
+            display: table-cell;
+            padding: 5px 10px;
+            border: 1px solid #ccc;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Matrix Decomposition</h2>
+<label for="matrixSize">Select Matrix Size:</label>
+<select id="matrixSize" onchange="createMatrixInput()">
+    <option value="2">2x2</option>
+    <option value="3" selected>3x3</option>
+    <option value="4">4x4</option>
+</select>
+
+<p>Enter a square matrix A:</p>
+<table id="matrixInput"></table>
+<button onclick="decompose()">Decompose</button>
+
+<div class="result" id="result"></div>
+
+<script>
+    let size = 3; // Default size
+
+    function createMatrixInput() {
+        size = parseInt(document.getElementById('matrixSize').value);
+        const table = document.getElementById('matrixInput');
+        table.innerHTML = '';
+        for (let i = 0; i < size; i++) {
+            const row = table.insertRow();
+            for (let j = 0; j < size; j++) {
+                const cell = row.insertCell();
+                const input = document.createElement('input');
+                input.type = 'number';
+                cell.appendChild(input);
+            }
+        }
+    }
+
+    function getMatrix() {
+        const table = document.getElementById('matrixInput');
+        const matrix = [];
+        for (let i = 0; i < size; i++) {
+            const row = [];
+            for (let j = 0; j < size; j++) {
+                const input = table.rows[i].cells[j].children[0];
+                row.push(parseFloat(input.value) || 0);
+            }
+            matrix.push(row);
+        }
+        return matrix;
+    }
+
+    function decompose() {
+        const A = getMatrix();
+        const { L, U } = doolittle(A);
+        const resultDiv = document.getElementById('result');
+        resultDiv.innerHTML = `<strong>Doolittle's Method:</strong><br>L:<br>${formatMatrix(L)}<br>U:<br>${formatMatrix(U)}<br><br>`;
+        
+        const { L: L2, U: U2 } = crout(A);
+        resultDiv.innerHTML += `<strong>Crout's Factorization:</strong><br>L:<br>${formatMatrix(L2)}<br>U:<br>${formatMatrix(U2)}<br><br>`;
+        
+        const { L: L3, U: U3 } = naiveGaussian(A);
+        resultDiv.innerHTML += `<strong>Naive Gaussian Elimination:</strong><br>L:<br>${formatMatrix(L3)}<br>U:<br>${formatMatrix(U3)}<br>`;
+    }
+
+    function formatMatrix(matrix) {
+        return matrix.map(row => 
+            `<div class="matrix-row">${row.map(cell => `<div class="matrix-cell">${cell.toFixed(2)}</div>`).join('')}</div>`
+        ).join('');
+    }
+
+    function doolittle(A) {
+        const n = A.length;
+        const L = Array.from({ length: n }, () => Array(n).fill(0));
+        const U = Array.from({ length: n }, () => Array(n).fill(0));
+
+        for (let i = 0; i < n; i++) {
+            // Compute U (upper triangular matrix)
+            for (let j = i; j < n; j++) {
+                U[i][j] = A[i][j] - sumProduct(L, U, i, j);
+            }
+
+            // Compute L (lower triangular matrix, diagonal is 1)
+            L[i][i] = 1; // Set diagonal of L to 1
+            for (let j = i + 1; j < n; j++) {
+                L[j][i] = (A[j][i] - sumProduct(L, U, j, i)) / U[i][i];
+            }
+        }
+        return { L, U };
+    }
+
+    function crout(A) {
+        const n = A.length;
+        const L = Array.from({ length: n }, () => Array(n).fill(0));
+        const U = Array.from({ length: n }, () => Array(n).fill(0));
+
+        for (let i = 0; i < n; i++) {
+            // Compute L (lower triangular matrix)
+            for (let j = i; j < n; j++) {
+                L[j][i] = A[j][i] - sumProduct(L, U, j, i);
+            }
+
+            // Compute U (upper triangular matrix, diagonal is 1)
+            U[i][i] = 1; // Set diagonal of U to 1
+            for (let j = i + 1; j < n; j++) {
+                U[i][j] = (A[i][j] - sumProduct(L, U, i, j)) / L[i][i];
+            }
+        }
+        return { L, U };
+    }
+
+    function naiveGaussian(A) {
+        const n = A.length;
+        const L = Array.from({ length: n }, () => Array(n).fill(0));
+        const U = Array.from({ length: n }, () => Array(n).fill(0));
+
+        for (let i = 0; i < n; i++) {
+            U[i] = [...A[i]]; // Copy row to U
+            for (let j = i + 1; j < n; j++) {
+                const m = U[j][i] / U[i][i];
+                L[j][i] = m; // Store multiplier in L
+                for (let k = i; k < n; k++) {
+                    U[j][k] -= m * U[i][k]; // Update row in U
+                }
+            }
+        }
+        for (let i = 0; i < n; i++) {
+            L[i][i] = 1; // Set diagonal of L to 1
+        }
+        return { L, U };
+    }
+
+    function sumProduct(L, U, i, j) {
+        let sum = 0;
+        for (let k = 0; k < j; k++) {
+            sum += L[i][k] * U[k][j];
+        }
+        return sum;
+    }
+
+    // Initialize the matrix input
+    createMatrixInput();
+</script>
+
+</body>
+</html>
